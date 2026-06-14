@@ -420,7 +420,7 @@ def build_parser():
     render_parser = subparsers.add_parser("render")
     render_parser.add_argument("--dataset-root", default="/kaggle/working/dataset/chair")
     render_parser.add_argument("--split", choices=["train", "val", "test", "all"], default="all")
-    render_parser.add_argument("--max-models", type=int, default=20)
+    render_parser.add_argument("--max-models", type=int, default=None)
     render_parser.add_argument("--views", type=int, default=4)
     render_parser.add_argument("--image-size", type=int, default=224)
     render_parser.add_argument("--workers", type=int, default=1)
