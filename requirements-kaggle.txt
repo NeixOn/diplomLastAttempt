@@ -1,0 +1,6 @@
+huggingface_hub
+trimesh
+pyrender
+pillow
+tqdm
+numpy
