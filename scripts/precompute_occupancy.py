@@ -102,6 +102,12 @@ def main():
     parser.add_argument("--bbox-size", type=float, default=0.6)
     parser.add_argument("--surface-sigma", type=float, default=0.03)
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument(
+        "--task-batch-size",
+        type=int,
+        default=None,
+        help="How many models to submit to one process pool at once. Smaller values survive bad meshes better.",
+    )
     parser.add_argument("--max-models", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--float16", action="store_true")
@@ -147,13 +153,29 @@ def main():
             except Exception as exc:
                 failures.append({"model_id": task["model_id"], "reason": repr(exc)})
     else:
-        with ProcessPoolExecutor(max_workers=args.workers) as executor:
-            futures = [executor.submit(process_one, task) for task in tasks]
-            for future in tqdm(as_completed(futures), total=len(futures)):
-                try:
-                    results.append(future.result())
-                except Exception as exc:
-                    failures.append({"reason": repr(exc)})
+        task_batch_size = args.task_batch_size or max(args.workers * 4, 1)
+        progress = tqdm(total=len(tasks))
+
+        for start in range(0, len(tasks), task_batch_size):
+            task_batch = tasks[start : start + task_batch_size]
+
+            with ProcessPoolExecutor(max_workers=args.workers) as executor:
+                future_to_task = {
+                    executor.submit(process_one, task): task for task in task_batch
+                }
+
+                for future in as_completed(future_to_task):
+                    task = future_to_task[future]
+                    try:
+                        results.append(future.result())
+                    except Exception as exc:
+                        failures.append(
+                            {"model_id": task["model_id"], "reason": repr(exc)}
+                        )
+                    finally:
+                        progress.update(1)
+
+        progress.close()
 
     with open(dataset_root / "occupancy_metadata.json", "w", encoding="utf-8") as file:
         json.dump(results, file, indent=2)
