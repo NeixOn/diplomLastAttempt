@@ -126,6 +126,10 @@ class ShapeNetRenderOccupancyDataset(Dataset):
             model_id = item["model_id"]
             if model_id not in metadata_by_id:
                 continue
+            if self.occupancy_root is not None:
+                occupancy_path = self.occupancy_root / f"{model_id}.npz"
+                if not occupancy_path.exists():
+                    continue
             mesh_path = metadata_by_id[model_id]["mesh_path"]
             for image_path in item["image_paths"]:
                 samples.append(
