@@ -33,11 +33,39 @@ python scripts/train_occupancy.py \
 
 Если это прошло, можно запускать дольше.
 
-## 3. Первый нормальный запуск
+## 3. Предвычислить occupancy
+
+On-the-fly `trimesh.contains()` слишком медленный для обучения. Поэтому сначала считаем occupancy один раз на mesh:
+
+```bash
+python scripts/precompute_occupancy.py \
+  --dataset-root ./dataset/chair \
+  --occupancy-root ./dataset/chair/occupancy \
+  --points-per-model 20000 \
+  --workers 16 \
+  --float16 \
+  --skip-existing
+```
+
+Для быстрой проверки:
+
+```bash
+python scripts/precompute_occupancy.py \
+  --dataset-root ./dataset/chair \
+  --occupancy-root ./dataset/chair/occupancy \
+  --points-per-model 5000 \
+  --max-models 100 \
+  --workers 8 \
+  --float16 \
+  --skip-existing
+```
+
+## 4. Первый нормальный запуск
 
 ```bash
 python scripts/train_occupancy.py \
   --dataset-root ./dataset/chair \
+  --occupancy-root ./dataset/chair/occupancy \
   --output-dir ./outputs/occupancy_chair \
   --epochs 20 \
   --batch-size 16 \
@@ -51,7 +79,7 @@ python scripts/train_occupancy.py \
 --batch-size 8 --points-per-item 1024
 ```
 
-## 4. Реконструкция mesh по одной картинке
+## 5. Реконструкция mesh по одной картинке
 
 Выбери любую картинку:
 

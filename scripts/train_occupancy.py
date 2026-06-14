@@ -303,6 +303,7 @@ def parse_args():
     parser.add_argument("--near-surface-ratio", type=float, default=0.5)
     parser.add_argument("--bbox-size", type=float, default=0.6)
     parser.add_argument("--surface-sigma", type=float, default=0.03)
+    parser.add_argument("--occupancy-root", default=None)
     parser.add_argument("--latent-dim", type=int, default=256)
     parser.add_argument("--hidden-dim", type=int, default=256)
     parser.add_argument("--decoder-layers", type=int, default=5)
@@ -333,6 +334,7 @@ def main():
         near_surface_ratio=args.near_surface_ratio,
         bbox_size=args.bbox_size,
         surface_sigma=args.surface_sigma,
+        occupancy_root=args.occupancy_root,
         max_items=args.max_train_items,
     )
     val_dataset = ShapeNetRenderOccupancyDataset(
@@ -343,6 +345,7 @@ def main():
         near_surface_ratio=args.near_surface_ratio,
         bbox_size=args.bbox_size,
         surface_sigma=args.surface_sigma,
+        occupancy_root=args.occupancy_root,
         max_items=args.max_val_items,
     )
 
