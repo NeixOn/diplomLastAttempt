@@ -83,12 +83,8 @@ def process_one(task):
     if task["float16"]:
         points = points.astype(np.float16)
 
-    np.savez_compressed(
-        out_path,
-        points=points,
-        labels=labels,
-        model_id=model_id,
-    )
+    save_fn = np.savez_compressed if task["compress"] else np.savez
+    save_fn(out_path, points=points, labels=labels, model_id=model_id)
     return {"model_id": model_id, "status": "created", "path": str(out_path)}
 
 
@@ -111,6 +107,11 @@ def main():
     parser.add_argument("--max-models", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--float16", action="store_true")
+    parser.add_argument(
+        "--no-compress",
+        action="store_true",
+        help="Save .npz without compression. Uses more disk but is faster.",
+    )
     parser.add_argument("--skip-existing", action="store_true")
     args = parser.parse_args()
 
@@ -138,6 +139,7 @@ def main():
                 "bbox_size": args.bbox_size,
                 "surface_sigma": args.surface_sigma,
                 "float16": args.float16,
+                "compress": not args.no_compress,
                 "skip_existing": args.skip_existing,
                 "seed": args.seed + idx,
             }
