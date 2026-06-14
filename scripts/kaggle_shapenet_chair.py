@@ -367,6 +367,10 @@ def render_dataset(args):
     print(f"rendered/skipped models: {len(render_metadata)}")
     print(f"failed: {len(failed_render)}")
     print(f"images: {len(list(renders_root.glob('*/*.png')))}")
+    if failed_render:
+        print("first failures:")
+        for failure in failed_render[:5]:
+            print(json.dumps(failure, ensure_ascii=False))
 
 
 def clean(args):
