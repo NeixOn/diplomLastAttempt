@@ -103,6 +103,7 @@ class ShapeNetRenderOccupancyDataset(Dataset):
         near_surface_ratio,
         bbox_size,
         surface_sigma,
+        occupancy_root=None,
         max_items=None,
     ):
         self.dataset_root = Path(dataset_root)
@@ -110,6 +111,7 @@ class ShapeNetRenderOccupancyDataset(Dataset):
         self.near_surface_ratio = near_surface_ratio
         self.bbox_size = bbox_size
         self.surface_sigma = surface_sigma
+        self.occupancy_root = Path(occupancy_root) if occupancy_root else None
 
         split_ids = load_split_ids(self.dataset_root, split)
         metadata_by_id = {
@@ -157,14 +159,17 @@ class ShapeNetRenderOccupancyDataset(Dataset):
         image = Image.open(sample["image_path"]).convert("RGB")
         image = self.image_transform(image)
 
-        mesh = load_mesh_cached(sample["mesh_path"])
-        points, labels = sample_occupancy_points(
-            mesh=mesh,
-            num_points=self.points_per_item,
-            near_surface_ratio=self.near_surface_ratio,
-            bbox_size=self.bbox_size,
-            surface_sigma=self.surface_sigma,
-        )
+        if self.occupancy_root is not None:
+            points, labels = self._sample_cached_occupancy(sample["model_id"])
+        else:
+            mesh = load_mesh_cached(sample["mesh_path"])
+            points, labels = sample_occupancy_points(
+                mesh=mesh,
+                num_points=self.points_per_item,
+                near_surface_ratio=self.near_surface_ratio,
+                bbox_size=self.bbox_size,
+                surface_sigma=self.surface_sigma,
+            )
 
         return {
             "image": image,
@@ -172,6 +177,19 @@ class ShapeNetRenderOccupancyDataset(Dataset):
             "labels": torch.from_numpy(labels),
             "model_id": sample["model_id"],
         }
+
+    def _sample_cached_occupancy(self, model_id):
+        npz_path = self.occupancy_root / f"{model_id}.npz"
+        data = np.load(npz_path)
+        points = data["points"]
+        labels = data["labels"]
+
+        if len(points) >= self.points_per_item:
+            indices = np.random.choice(len(points), self.points_per_item, replace=False)
+        else:
+            indices = np.random.choice(len(points), self.points_per_item, replace=True)
+
+        return points[indices].astype(np.float32), labels[indices].astype(np.float32)
 
 
 class ImageEncoder(nn.Module):
