@@ -19,6 +19,7 @@ def load_model(checkpoint_path, device):
         latent_dim=saved_args["latent_dim"],
         hidden_dim=saved_args["hidden_dim"],
         num_layers=saved_args["decoder_layers"],
+        pretrained_encoder=saved_args.get("pretrained_encoder", False),
     ).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()

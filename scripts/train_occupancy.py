@@ -197,9 +197,10 @@ class ShapeNetRenderOccupancyDataset(Dataset):
 
 
 class ImageEncoder(nn.Module):
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, pretrained=False):
         super().__init__()
-        backbone = models.resnet18(weights=None)
+        weights = models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
+        backbone = models.resnet18(weights=weights)
         in_features = backbone.fc.in_features
         backbone.fc = nn.Identity()
         self.backbone = backbone
@@ -233,9 +234,9 @@ class OccupancyDecoder(nn.Module):
 
 
 class ImageToOccupancy(nn.Module):
-    def __init__(self, latent_dim, hidden_dim, num_layers):
+    def __init__(self, latent_dim, hidden_dim, num_layers, pretrained_encoder=False):
         super().__init__()
-        self.encoder = ImageEncoder(latent_dim)
+        self.encoder = ImageEncoder(latent_dim, pretrained=pretrained_encoder)
         self.decoder = OccupancyDecoder(latent_dim, hidden_dim, num_layers)
 
     def forward(self, images, points):
@@ -251,7 +252,23 @@ def move_batch_to_device(batch, device):
     }
 
 
-def run_epoch(model, loader, optimizer, device, train):
+def compute_bce_loss(logits, labels, pos_weight_mode):
+    if pos_weight_mode == "none":
+        return F.binary_cross_entropy_with_logits(logits, labels)
+
+    if pos_weight_mode == "auto":
+        with torch.no_grad():
+            positives = labels.sum()
+            negatives = labels.numel() - positives
+            pos_weight = negatives / positives.clamp_min(1.0)
+            pos_weight = pos_weight.clamp(1.0, 20.0)
+        return F.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weight)
+
+    pos_weight = torch.tensor(float(pos_weight_mode), device=logits.device)
+    return F.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weight)
+
+
+def run_epoch(model, loader, optimizer, device, train, pos_weight_mode):
     model.train(train)
     total_loss = 0.0
     total_correct = 0
@@ -263,7 +280,7 @@ def run_epoch(model, loader, optimizer, device, train):
 
         with torch.set_grad_enabled(train):
             logits = model(batch["image"], batch["points"])
-            loss = F.binary_cross_entropy_with_logits(logits, batch["labels"])
+            loss = compute_bce_loss(logits, batch["labels"], pos_weight_mode)
 
             if train:
                 optimizer.zero_grad(set_to_none=True)
@@ -311,6 +328,12 @@ def parse_args():
     parser.add_argument("--latent-dim", type=int, default=256)
     parser.add_argument("--hidden-dim", type=int, default=256)
     parser.add_argument("--decoder-layers", type=int, default=5)
+    parser.add_argument("--pretrained-encoder", action="store_true")
+    parser.add_argument(
+        "--pos-weight",
+        default="none",
+        help="Use 'none', 'auto', or a numeric positive-class BCE weight.",
+    )
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -376,6 +399,7 @@ def main():
         latent_dim=args.latent_dim,
         hidden_dim=args.hidden_dim,
         num_layers=args.decoder_layers,
+        pretrained_encoder=args.pretrained_encoder,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
 
@@ -383,8 +407,22 @@ def main():
     history = []
 
     for epoch in range(1, args.epochs + 1):
-        train_metrics = run_epoch(model, train_loader, optimizer, device, train=True)
-        val_metrics = run_epoch(model, val_loader, optimizer, device, train=False)
+        train_metrics = run_epoch(
+            model,
+            train_loader,
+            optimizer,
+            device,
+            train=True,
+            pos_weight_mode=args.pos_weight,
+        )
+        val_metrics = run_epoch(
+            model,
+            val_loader,
+            optimizer,
+            device,
+            train=False,
+            pos_weight_mode=args.pos_weight,
+        )
 
         metrics = {
             "epoch": epoch,

@@ -79,6 +79,26 @@ python scripts/train_occupancy.py \
 --batch-size 8 --points-per-item 1024
 ```
 
+## 4.1. Улучшенный запуск: pretrained encoder + balanced BCE
+
+Если baseline уже работает, лучше не пересчитывать occupancy, а переобучить модель с ImageNet-pretrained ResNet18 и балансировкой inside/outside:
+
+```bash
+python scripts/train_occupancy.py \
+  --dataset-root ./dataset/chair \
+  --occupancy-root ./dataset/chair/occupancy_mvp \
+  --output-dir ./outputs/occupancy_chair_pretrained \
+  --epochs 30 \
+  --max-train-items 8000 \
+  --max-val-items 512 \
+  --batch-size 32 \
+  --points-per-item 1024 \
+  --workers 8 \
+  --device cuda \
+  --pretrained-encoder \
+  --pos-weight auto
+```
+
 ## 5. Реконструкция mesh по одной картинке
 
 Выбери любую картинку:
