@@ -4,3 +4,4 @@ pyrender
 pillow
 tqdm
 numpy
+scipy
